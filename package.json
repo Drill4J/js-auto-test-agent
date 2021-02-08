@@ -4,7 +4,7 @@
   "description": "A thin wrapper to communicate with autotest-extension-dispatcher",
   "main": "dist/index.js",
   "scripts": {
-    "release": "set NODE_ENV=production&& npx webpack --config webpack.config.js"
+    "build": "set NODE_ENV=production&& npx webpack --config webpack.config.js"
   },
   "author": "",
   "license": "Apache-2.0",
