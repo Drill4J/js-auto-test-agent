@@ -1,0 +1,30 @@
+{
+  "type": "CONNECT",
+  "from": {
+      "id": "aeb531ff-53dd-4662-b79d-08518f5741cf",
+      "type": "autotest-agent"
+  },
+  "payload": ""
+}
+{
+  "type": "START_TEST",
+  "from": {
+      "id": "aeb531ff-53dd-4662-b79d-08518f5741cf", // random generated string
+      "type": "autotest-agent" // fixed value
+  },
+  "payload": {
+      "sessionId": "testSession", // another random generated value
+      "testName": "%5Bengine%3Ajunit-jupiter%5D%2F%5Bclass%3Aabs.ChromeTest%5D%2F%5Bmethod%3AitCanBeAnyTestName1%28%29%5D"
+  }
+}
+{
+  "type": "FINISH_TEST",
+  "from": {
+      "id": "aeb531ff-53dd-4662-b79d-08518f5741cf",
+      "type": "autotest-agent"
+  },
+  "payload": {
+      "sessionId": "testSession",
+      "testName": "%5Bengine%3Ajunit-jupiter%5D%2F%5Bclass%3Aabs.ChromeTest%5D%2F%5Bmethod%3AitCanBeAnyTestName1%28%29%5D"
+  }
+}
