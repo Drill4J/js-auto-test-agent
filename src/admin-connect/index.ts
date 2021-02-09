@@ -1,7 +1,6 @@
 import axios, { AxiosError } from 'axios';
 import LoggerProvider from '../util/logger';
 import { v4 as uuid } from 'uuid';
-import { browser } from 'webextension-polyfill-ts';
 import { SessionActionError } from './session-action-error';
 
 export enum AdminMessage {
@@ -64,7 +63,7 @@ function ensureProtocol(url: string) {
 async function setupAxios(backendUrl: string) {
   axios.defaults.baseURL = `${ensureProtocol(backendUrl)}/api/`;
 
-  const authToken = await getAuthToken();
+  const authToken = await login();
 
   axios.interceptors.request.use(async config => {
     // eslint-disable-next-line no-param-reassign
@@ -73,12 +72,6 @@ async function setupAxios(backendUrl: string) {
   });
 
   return authToken;
-}
-
-async function getAuthToken() {
-  const { token } = await browser.storage.local.get('token');
-  if (token) return token;
-  return login();
 }
 
 async function login() {
