@@ -16,8 +16,13 @@ const logger = LoggerProvider.getLogger('drill', 'admin');
 const AUTH_TOKEN_HEADER_NAME = 'Authorization';
 
 export default async (backendUrl: string, agentId?: string, groupId?: string) => {
-  logger.debug('logging in...');
-  await setupAxios(backendUrl);
+  logger.info('logging in...');
+  try {
+    await setupAxios(backendUrl);
+  } catch (e) {
+    logger.error('o%', e);
+    throw e;
+  }
   logger.debug('logged in!');
 
   let route = 'agents';
@@ -27,7 +32,7 @@ export default async (backendUrl: string, agentId?: string, groupId?: string) =>
     id = groupId;
   }
   const test2CodeRoute = `/${route}/${id}/plugins/test2code/dispatch-action`;
-  logger.debug(`test2code route ${test2CodeRoute}`);
+  logger.info(`test2code route ${test2CodeRoute}`);
 
   return {
     async startSession() {

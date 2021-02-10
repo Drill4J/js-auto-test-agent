@@ -17,25 +17,35 @@ export enum IncomingMessage {
   FINISH_TEST = 'FINISH_TEST',
 }
 
-export default async function connect(url: string | URL, connectTimeout?) {
+type DispatcherConnectOptions = {
+  connectTimeout?: number;
+  extensionReadyTimeout?: number;
+  clientId?: string | number;
+};
+
+export default async function connect(
+  url: string | URL,
+  { connectTimeout, clientId, extensionReadyTimeout }: DispatcherConnectOptions = {},
+) {
   logger.info('connecting...');
 
   const socket = new WebSocket(url);
+  socket.on('error', error => logger.error('o%', error));
   await socketEvent(socket, 'open', connectTimeout);
   logger.debug('connection open!');
 
-  const clientId = uuidv4();
-  logger.debug(`client id: ${clientId}`);
-  const send = createSender(socket, clientId, logger);
+  const id = clientId || uuidv4();
+  logger.debug(`client id: ${id}`);
+  const send = createSender(socket, id, logger);
 
   logger.debug('sending connect message...');
-  await send(DispatcherMessage.CONNECT);
+  send(DispatcherMessage.CONNECT, undefined, undefined, false);
   logger.debug('connect message sent!');
 
   logger.info('ready!');
 
   return {
-    ready: createMessageAwaiter(socket, logger)(IncomingMessage.READY),
+    ready: createMessageAwaiter(socket, logger)(IncomingMessage.READY, extensionReadyTimeout),
     startTest: async (sessionId: string, testName: string) => send(DispatcherMessage.START_TEST, { testName, sessionId }),
     finishTest: async (sessionId: string, testName: string) => send(DispatcherMessage.FINISH_TEST, { testName, sessionId }),
     destroy: async () => {
@@ -51,19 +61,26 @@ function createSender(socket: WebSocket, clientId: string, logger: ILogger) {
     type: DispatcherMessage,
     payload: unknown = {},
     timeout = parseInt(process.env.DRILL_MESSAGE_TIMEOUT) || 10000,
+    mustWaitResponse = true,
   ): Promise<void> => {
     return new Promise((resolve, reject) => {
-      socket.on('message', (raw: string) => {
-        try {
-          const { type: responseType, payload } = JSON.parse(raw);
-          logger.debug(`"${responseType}" - response %o`, payload);
-          if (responseType === type) {
-            resolve(payload);
+      let timedOut = false;
+
+      if (mustWaitResponse) {
+        socket.on('message', (raw: string) => {
+          try {
+            const { type: responseType, payload } = JSON.parse(raw);
+            logger.debug(`"${responseType}" - response %o`, payload);
+            if (responseType === type) {
+              if (timedOut) return;
+              clearTimeout(timeoutTimer);
+              resolve(payload);
+            }
+          } catch (e) {
+            logger.error(`failed to process "${type}" response %o`, e);
           }
-        } catch (e) {
-          logger.error(`failed to process "${type}" response %o`, e);
-        }
-      });
+        });
+      }
 
       logger.debug(`${type} - send`);
       socket.send(
@@ -76,7 +93,13 @@ function createSender(socket: WebSocket, clientId: string, logger: ILogger) {
           payload,
         }),
       );
-      setTimeout(() => reject(new Error(`"${type}" response timed out: ${timeout}ms`)), timeout);
+
+      if (!mustWaitResponse) resolve();
+
+      const timeoutTimer = setTimeout(() => {
+        reject(new Error(`"${type}" response timed out: ${timeout}ms`));
+        timedOut = true;
+      }, timeout);
     });
   };
 }
