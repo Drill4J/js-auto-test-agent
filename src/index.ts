@@ -8,9 +8,9 @@ export interface AutotestAgent {
 }
 
 export default async (): Promise<Promise<AutotestAgent>> => {
-  const { agentId, groupId, adminUrl, dispatcherUrl, clientId, dispatcherConnectTimeout, extensionReadyTimeout } = getSettingsFromEnvVars();
+  const { agentId, groupId, adminUrl, dispatcherUrl, clientId, dispatcherConnectTimeout, extensionReadyTimeout, testActionsTimeout } = getSettingsFromEnvVars();
   const admin = await adminConnect(adminUrl, agentId, groupId);
-  const dispatcher = await dispatcherConnect(dispatcherUrl, { clientId, connectTimeout: dispatcherConnectTimeout, extensionReadyTimeout });
+  const dispatcher = await dispatcherConnect(dispatcherUrl, { clientId, connectTimeout: dispatcherConnectTimeout, extensionReadyTimeout, testActionsTimeout });
   return (async () => {
     await dispatcher.ready;
     const sessionId = await admin.startSession();
@@ -35,6 +35,8 @@ function getSettingsFromEnvVars() {
     (process.env.DRILL_DISPATCHER_CONNECT_TIMEOUT_MS && parseInt(process.env.DRILL_DISPATCHER_CONNECT_TIMEOUT_MS)) || 20000;
   const extensionReadyTimeout =
     (process.env.DRILL_EXTENSION_READY_TIMEOUT_MS && parseInt(process.env.DRILL_EXTENSION_READY_TIMEOUT_MS)) || 60000;
+  const testActionsTimeout =
+    (process.env.DRILL_TEST_ACTIONS_TIMEOUT_MS && parseInt(process.env.DRILL_TEST_ACTIONS_TIMEOUT_MS)) || 60000;
   if (!agentId && !groupId) {
     throw new Error('Please specify either DRILL_AGENT_ID or DRILL_GROUP_ID in env variables');
   }
@@ -44,5 +46,5 @@ function getSettingsFromEnvVars() {
   if (!dispatcherUrl) {
     throw new Error('Please specify DRILL_DISPATCHER_URL in env variables');
   }
-  return { agentId, groupId, adminUrl, dispatcherUrl, clientId, dispatcherConnectTimeout, extensionReadyTimeout };
+  return { agentId, groupId, adminUrl, dispatcherUrl, clientId, dispatcherConnectTimeout, extensionReadyTimeout, testActionsTimeout };
 }

@@ -20,12 +20,13 @@ export enum IncomingMessage {
 type DispatcherConnectOptions = {
   connectTimeout?: number;
   extensionReadyTimeout?: number;
+  testActionsTimeout?: number;
   clientId?: string | number;
 };
 
 export default async function connect(
   url: string | URL,
-  { connectTimeout, clientId, extensionReadyTimeout }: DispatcherConnectOptions = {},
+  { connectTimeout, clientId, extensionReadyTimeout, testActionsTimeout }: DispatcherConnectOptions = {},
 ) {
   logger.info('connecting...');
 
@@ -46,8 +47,10 @@ export default async function connect(
 
   return {
     ready: createMessageAwaiter(socket, logger)(IncomingMessage.READY, extensionReadyTimeout),
-    startTest: async (sessionId: string, testName: string) => send(DispatcherMessage.START_TEST, { testName, sessionId }),
-    finishTest: async (sessionId: string, testName: string) => send(DispatcherMessage.FINISH_TEST, { testName, sessionId }),
+    startTest: async (sessionId: string, testName: string) =>
+      send(DispatcherMessage.START_TEST, { testName, sessionId }, testActionsTimeout),
+    finishTest: async (sessionId: string, testName: string) =>
+      send(DispatcherMessage.FINISH_TEST, { testName, sessionId }, testActionsTimeout),
     destroy: async () => {
       const closePromise = socketEvent(socket, 'close');
       socket.close(1000);
