@@ -24,20 +24,13 @@ export default async (backendUrl: string, agentId?: string, groupId?: string) =>
     throw e;
   }
   logger.debug('logged in!');
-
-  let route = 'agents';
-  let id = agentId;
-  if (groupId) {
-    route = 'service-groups';
-    id = groupId;
-  }
-  const test2CodeRoute = `/${route}/${id}/plugins/test2code/dispatch-action`;
+  const test2CodeRoute = getTest2CodeApiRoute(agentId, groupId);
   logger.info(`test2code route ${test2CodeRoute}`);
 
   return {
     async startSession() {
       const sessionId = uuid();
-      await axiosPost(test2CodeRoute, {
+      await sendSessionAction(test2CodeRoute, {
         type: AdminMessage.START,
         payload: {
           sessionId,
@@ -49,13 +42,29 @@ export default async (backendUrl: string, agentId?: string, groupId?: string) =>
     },
 
     async stopSession(sessionId: string) {
-      await axiosPost(test2CodeRoute, {
+      await sendSessionAction(test2CodeRoute, {
         type: AdminMessage.STOP,
         payload: { sessionId },
       });
     },
   };
 };
+
+function getTest2CodeApiRoute(agentId, groupId) {
+  let route;
+  let id;
+  if (agentId) {
+    route = 'agents';
+    id = agentId;
+  } else if (groupId) {
+    route = 'service-groups';
+    id = groupId;
+  } else {
+    throw new Error('@drill4j/js-auto-test-agent: failed to connect to backend: no agentId or groupId provided');
+  }
+
+  return `/${route}/${id}/plugins/test2code/dispatch-action`;
+}
 
 function ensureProtocol(url: string) {
   const hasProtocol = url.indexOf('http') > -1 || url.indexOf('https') > -1;
@@ -82,61 +91,40 @@ async function setupAxios(backendUrl: string) {
 async function login() {
   const { headers } = await axios.post('/login');
   const authToken = headers[AUTH_TOKEN_HEADER_NAME.toLowerCase()];
-  if (!authToken) throw new Error('Drill backend authentication failed');
+  if (!authToken) throw new Error('@drill4j/js-auto-test-agent: backend authentication failed');
   return authToken;
 }
 
-async function axiosPost(baseUrl: string, payload: unknown) {
+async function sendSessionAction(baseUrl: string, payload: unknown) {
   let data;
   try {
-    logger.debug('send %s %o', baseUrl, payload);
     const res = await axios.post(baseUrl, payload);
     data = res?.data;
+
+    if (Array.isArray(data)) {
+      const atLeastOneOperationIsSuccessful = data.some((x: any) => x.code === 200);
+      if (!atLeastOneOperationIsSuccessful) throw new Error(stringify(data));
+    }
   } catch (e) {
-    // FIXME this is specific to session actions, might as well move it elsewhere or rename a function
-    if (isAxiosError(e)) {
-      if (e.response?.data?.code === 404) {
-        throw new SessionActionError(e.response?.data?.message, (payload as any).payload.sessionId);
-      }
-    }
-
-    throw new Error(getErrorMessage(e));
+    throw new SessionActionError(getErrorMessage(e), (payload as any).payload.sessionId);
   }
-
-  if (Array.isArray(data)) {
-    if (!data.some(x => x.code === 200)) {
-      // TODO change when we will figure out SG actions handling
-      throw new Error('unexpected error');
-    }
-  } else if (data.code !== 200) {
-    // TODO if backend always sets correct status codes that must not happen
-    throw new Error('unexpected error');
-  }
-  return data;
 }
 
-function getErrorMessage(e: unknown): string {
-  if (typeof e === 'string') return e;
-
-  if (typeof e === 'object') {
-    if (isAxiosError(e)) {
-      if (e.response?.data?.message) {
-        return e.response.data.message;
-      }
-      if (e.response?.status === 400) {
-        return 'bad request';
-      }
-      if (e.response?.status === 500) {
-        return 'internal server error';
-      }
-    }
+function getErrorMessage(e: any): string {
+  const defaultMessage = 'unexpected error';
+  if (e?.isAxiosError && e.response?.data?.message) {
+    return e.response?.data?.message;
   }
-
-  logger.error('unexpected error %o', e);
-  return 'unexpected error';
+  if (e?.message) {
+    return e.message;
+  }
+  return `@drill4j/js-auto-test-agent: ${stringify(e) || defaultMessage}`;
 }
 
-function isAxiosError(e: unknown): e is AxiosError {
-  if (e && (e as any).isAxiosError) return true;
-  return false;
+function stringify(data: any) {
+  try {
+    return JSON.stringify(data);
+  } catch (e) {
+    return undefined;
+  }
 }

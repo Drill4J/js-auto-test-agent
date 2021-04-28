@@ -26,7 +26,7 @@ module.exports = {
   output: {
     path: path.resolve(__dirname, 'dist'),
     filename: 'index.js',
-    library: 'Drill4J',
+    library: 'DrillJsAutoTestAgent',
     libraryTarget: 'umd',
     globalObject: 'this',
     umdNamedDefine: true,

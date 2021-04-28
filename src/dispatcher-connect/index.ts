@@ -17,8 +17,10 @@ export enum IncomingMessage {
   FINISH_TEST = 'FINISH_TEST',
 }
 
-type DispatcherConnectOptions = {
-  connectTimeout?: number;
+export { default as StubDispatcher } from './stub';
+
+export type DispatcherConnectOptions = {
+  dispatcherConnectTimeout?: number;
   extensionReadyTimeout?: number;
   testActionsTimeout?: number;
   clientId?: string | number;
@@ -26,13 +28,13 @@ type DispatcherConnectOptions = {
 
 export default async function connect(
   url: string | URL,
-  { connectTimeout, clientId, extensionReadyTimeout, testActionsTimeout }: DispatcherConnectOptions = {},
+  { clientId, dispatcherConnectTimeout = 20000, extensionReadyTimeout = 20000, testActionsTimeout = 60000 }: DispatcherConnectOptions = {},
 ) {
   logger.info('connecting...');
 
   const socket = new WebSocket(url);
   socket.on('error', error => logger.error('o%', error));
-  await socketEvent(socket, 'open', connectTimeout);
+  await socketEvent(socket, 'open', dispatcherConnectTimeout);
   logger.debug('connection open!');
 
   const id = clientId || uuidv4();

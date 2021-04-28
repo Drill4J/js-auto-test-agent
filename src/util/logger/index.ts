@@ -41,7 +41,7 @@ export default class LoggerProvider {
     // TODO this is a terrible spaghetti, refactor it
     const logFn = debug(`${prefix}:${name}`);
     const logger = {};
-    const loggingLevel = parseInt(process.env.DEBUG_LOG_LEVEL, 10) || 1;
+    const loggingLevel = parseInt(process.env.DEBUG_LOG_LEVEL, 10) || 1; // TODO set log level from localStorage for browser installations
     Object.keys(levels).forEach(levelIndex => {
       const params = levels[levelIndex];
       logger[params.name] = (...args) => {

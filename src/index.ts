@@ -1,20 +1,39 @@
+import * as environment from 'browser-or-node';
 import adminConnect from './admin-connect';
-import dispatcherConnect from './dispatcher-connect';
+import dispatcherConnect, { DispatcherConnectOptions, StubDispatcher } from './dispatcher-connect';
+import getSettings from './settings';
 
 export interface AutotestAgent {
+  sessionId: string;
   startTest: (testName: any) => Promise<void>;
   finishTest: (testName: any) => Promise<void>;
   destroy: () => Promise<void>;
 }
 
-export default async (): Promise<Promise<AutotestAgent>> => {
-  const { agentId, groupId, adminUrl, dispatcherUrl, clientId, dispatcherConnectTimeout, extensionReadyTimeout, testActionsTimeout } = getSettingsFromEnvVars();
+export type AutotestAgentOptions = {
+  adminUrl: string;
+  agentId: string;
+  groupId?: string;
+  dispatcherUrl?: string;
+} & DispatcherConnectOptions;
+
+export default async function (options: AutotestAgentOptions): Promise<Promise<AutotestAgent>> {
+  console.log(
+    '@drill4j/js-auto-test-agent: this package utilizes debug module (https://www.npmjs.com/package/debug). Add "drill:*" prefix to see debug info',
+  );
+  const settings = getSettings(options);
+
+  const { adminUrl, agentId, groupId } = settings;
   const admin = await adminConnect(adminUrl, agentId, groupId);
-  const dispatcher = await dispatcherConnect(dispatcherUrl, { clientId, connectTimeout: dispatcherConnectTimeout, extensionReadyTimeout, testActionsTimeout });
+
+  const { dispatcherUrl, ...dispatcherOptions } = settings;
+  const dispatcher = await createDispatcher(dispatcherUrl, dispatcherOptions);
+
   return (async () => {
     await dispatcher.ready;
     const sessionId = await admin.startSession();
     return {
+      sessionId,
       startTest: async (testName: any) => dispatcher.startTest(sessionId, testName),
       finishTest: async (testName: any) => dispatcher.finishTest(sessionId, testName),
       destroy: async () => {
@@ -23,28 +42,14 @@ export default async (): Promise<Promise<AutotestAgent>> => {
       },
     };
   })();
-};
+}
 
-function getSettingsFromEnvVars() {
-  const agentId = process.env.DRILL_AGENT_ID;
-  const groupId = process.env.DRILL_GROUP_ID;
-  const adminUrl = process.env.DRILL_ADMIN_URL;
-  const dispatcherUrl = process.env.DRILL_DISPATCHER_URL;
-  const clientId = process.env.DRILL_CLIENT_ID;
-  const dispatcherConnectTimeout =
-    (process.env.DRILL_DISPATCHER_CONNECT_TIMEOUT_MS && parseInt(process.env.DRILL_DISPATCHER_CONNECT_TIMEOUT_MS)) || 20000;
-  const extensionReadyTimeout =
-    (process.env.DRILL_EXTENSION_READY_TIMEOUT_MS && parseInt(process.env.DRILL_EXTENSION_READY_TIMEOUT_MS)) || 60000;
-  const testActionsTimeout =
-    (process.env.DRILL_TEST_ACTIONS_TIMEOUT_MS && parseInt(process.env.DRILL_TEST_ACTIONS_TIMEOUT_MS)) || 60000;
-  if (!agentId && !groupId) {
-    throw new Error('Please specify either DRILL_AGENT_ID or DRILL_GROUP_ID in env variables');
+async function createDispatcher(dispatcherUrl, options) {
+  if (dispatcherUrl) {
+    return await dispatcherConnect(dispatcherUrl, options);
   }
-  if (!adminUrl) {
-    throw new Error('Please specify DRILL_ADMIN_URL in env variables');
-  }
-  if (!dispatcherUrl) {
-    throw new Error('Please specify DRILL_DISPATCHER_URL in env variables');
-  }
-  return { agentId, groupId, adminUrl, dispatcherUrl, clientId, dispatcherConnectTimeout, extensionReadyTimeout, testActionsTimeout };
+  const msg = `@drill4j/js-auto-test-agent: dispatcher is not initiated: ${
+    environment.isNode ? 'DRILL_DISPATCHER_URL is not specified in env variables' : 'dispatcherUrl is not specified in options'
+  }`;
+  return StubDispatcher(msg);
 }
