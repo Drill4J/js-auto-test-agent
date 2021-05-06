@@ -1,5 +1,5 @@
 import * as environment from 'browser-or-node';
-import adminConnect from './admin-connect';
+import adminConnect, { TestInfo, TestResult } from './admin-connect';
 import dispatcherConnect, { DispatcherConnectOptions, StubDispatcher } from './dispatcher-connect';
 import getSettings from './settings';
 
@@ -29,6 +29,8 @@ export default async function (options: AutotestAgentOptions): Promise<Promise<A
   const { dispatcherUrl, ...dispatcherOptions } = settings;
   const dispatcher = await createDispatcher(dispatcherUrl, dispatcherOptions);
 
+  const tests: TestInfo[] = [];
+
   return (async () => {
     await dispatcher.ready;
     const sessionId = await admin.startSession();
@@ -36,7 +38,16 @@ export default async function (options: AutotestAgentOptions): Promise<Promise<A
       sessionId,
       startTest: async (testName: any) => dispatcher.startTest(sessionId, testName),
       finishTest: async (testName: any) => dispatcher.finishTest(sessionId, testName),
+      addTest: (name: string, state: TestResult, startedAt: number, duration: number) => {
+        tests.push({
+          name,
+          result: state,
+          startedAt: startedAt,
+          finishedAt: startedAt + duration,
+        });
+      },
       destroy: async () => {
+        await admin.addTests(sessionId, tests);
         await dispatcher.destroy();
         await admin.stopSession(sessionId);
       },

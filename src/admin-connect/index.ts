@@ -6,11 +6,34 @@ import { SessionActionError } from './session-action-error';
 export enum AdminMessage {
   START = 'START',
   STOP = 'STOP',
+  ADD_TESTS = 'ADD_TESTS',
 }
 
 export enum TestType {
   AUTO = 'AUTO',
 }
+
+export enum TestResult {
+  PASSED = 'PASSED',
+  FAILED = 'FAILED',
+  SKIPPED = 'SKIPPED',
+  ERROR = 'ERROR',
+  UNKNOWN = 'UNKNOWN',
+}
+
+type TestRun = {
+  name: string;
+  startedAt: number;
+  finishedAt: number;
+  tests: TestInfo[];
+};
+
+export type TestInfo = {
+  name: string;
+  result: TestResult;
+  startedAt: number;
+  finishedAt: number;
+};
 
 const logger = LoggerProvider.getLogger('drill', 'admin');
 const AUTH_TOKEN_HEADER_NAME = 'Authorization';
@@ -45,6 +68,25 @@ export default async (backendUrl: string, agentId?: string, groupId?: string) =>
       await sendSessionAction(test2CodeRoute, {
         type: AdminMessage.STOP,
         payload: { sessionId },
+      });
+    },
+
+    async addTests(sessionId: string, tests: TestInfo[]) {
+      const startedAt = findMin('startedAt')(tests);
+      const finishedAt = findMax('finishedAt')(tests);
+
+      const payload: { sessionId: string; testRun: TestRun } = {
+        sessionId,
+        testRun: {
+          name: '',
+          startedAt,
+          finishedAt,
+          tests,
+        },
+      };
+      await sendSessionAction(test2CodeRoute, {
+        type: AdminMessage.ADD_TESTS,
+        payload,
       });
     },
   };
@@ -128,3 +170,7 @@ function stringify(data: any) {
     return undefined;
   }
 }
+
+const prop = propName => object => object[propName];
+const findMin = propName => arr => Math.min.apply(null, arr.map(prop(propName)));
+const findMax = propName => arr => Math.max.apply(null, arr.map(prop(propName)));
